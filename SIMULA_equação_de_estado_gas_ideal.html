@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Simulador PV = nRT</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    background: #f4f4f4;
+}
+
+h1 { color: #003366; }
+
+.container {
+    max-width: 900px;
+    margin: auto;
+}
+
+canvas {
+    background: white;
+    border: 2px solid #333;
+}
+
+.painel {
+    margin-top: 20px;
+    padding: 15px;
+    background: white;
+    border-radius: 10px;
+}
+
+input {
+    width: 120px;
+    padding: 5px;
+}
+
+.resultado {
+    font-size: 22px;
+    margin-top: 15px;
+    color: #0044aa;
+    font-weight: bold;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Equação de Estado dos Gases Ideais</h1>
+<h2>PV = nRT</h2>
+
+<div class="container">
+
+<canvas id="canvas" width="700" height="400"></canvas>
+
+<div class="painel">
+
+<label>Volume relativo:</label>
+<input type="range" id="volume" min="20" max="100" value="80">
+<span id="vtxt">80</span>
+
+<br><br>
+
+<label>n (mol):</label>
+<input type="number" id="n" value="1" min="0.1" max="5" step="0.1">
+
+<label>T (K):</label>
+<input type="number" id="T" value="300" min="50" max="1000" step="10">
+
+<div class="resultado" id="resultado">P = ?</div>
+
+</div>
+</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+const esquerda = 100;
+const topo = 60;
+const altura = 260;
+const raio = 5;
+const R = 8.314;
+
+let moleculas = [];
+
+function velocidadePelaTemperatura() {
+    let T = parseFloat(document.getElementById("T").value);
+    return Math.sqrt(T / 300) * 2.2;
+}
+
+function numeroDeMoleculas() {
+    let n = parseFloat(document.getElementById("n").value);
+    return Math.round(n * 60);
+}
+
+function larguraAtual() {
+    let Vrel = parseFloat(document.getElementById("volume").value);
+    return Vrel * 4;
+}
+
+function criarMolecula() {
+    let largura = larguraAtual();
+    let velocidade = velocidadePelaTemperatura();
+    let angulo = Math.random() * 2 * Math.PI;
+
+    return {
+        x: esquerda + raio + Math.random() * (largura - 30),
+        y: topo + raio + Math.random() * (altura - 2 * raio),
+        vx: Math.cos(angulo) * velocidade,
+        vy: Math.sin(angulo) * velocidade
+    };
+}
+
+function ajustarQuantidadeMoleculas() {
+    let desejado = numeroDeMoleculas();
+
+    while (moleculas.length < desejado) {
+        moleculas.push(criarMolecula());
+    }
+
+    while (moleculas.length > desejado) {
+        moleculas.pop();
+    }
+}
+
+function ajustarVelocidadesPorTemperatura() {
+    let velocidade = velocidadePelaTemperatura();
+
+    for (let m of moleculas) {
+        let angulo = Math.atan2(m.vy, m.vx);
+        m.vx = Math.cos(angulo) * velocidade;
+        m.vy = Math.sin(angulo) * velocidade;
+    }
+}
+
+function calcularPressao() {
+    let Vrel = parseFloat(document.getElementById("volume").value);
+    let V = Vrel / 1000;
+
+    let n = parseFloat(document.getElementById("n").value);
+    let T = parseFloat(document.getElementById("T").value);
+
+    let P = (n * R * T) / V;
+
+    document.getElementById("resultado").innerHTML =
+        "P = " + P.toFixed(0) + " Pa";
+}
+
+function desenhar() {
+    let Vrel = parseFloat(document.getElementById("volume").value);
+    document.getElementById("vtxt").innerHTML = Vrel;
+
+    ajustarQuantidadeMoleculas();
+    ajustarVelocidadesPorTemperatura();
+    calcularPressao();
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    let largura = larguraAtual();
+
+    let limiteEsquerdo = esquerda + raio;
+    let limiteDireito = esquerda + largura - 20 - raio;
+    let limiteSuperior = topo + raio;
+    let limiteInferior = topo + altura - raio;
+
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(esquerda, topo, largura, altura);
+
+    ctx.fillStyle = "gray";
+    ctx.fillRect(esquerda + largura - 20, topo - 5, 20, altura + 10);
+
+    ctx.fillStyle = "gray";
+    ctx.fillRect(esquerda + largura, topo + altura / 2 - 5, 90, 10);
+
+    for (let m of moleculas) {
+        m.x += m.vx;
+        m.y += m.vy;
+
+        if (m.x < limiteEsquerdo) {
+            m.x = limiteEsquerdo;
+            m.vx *= -1;
+        }
+
+        if (m.x > limiteDireito) {
+            m.x = limiteDireito;
+            m.vx *= -1;
+        }
+
+        if (m.y < limiteSuperior) {
+            m.y = limiteSuperior;
+            m.vy *= -1;
+        }
+
+        if (m.y > limiteInferior) {
+            m.y = limiteInferior;
+            m.vy *= -1;
+        }
+
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, raio, 0, 2 * Math.PI);
+        ctx.fillStyle = "#0066ff";
+        ctx.fill();
+    }
+
+    ctx.font = "22px Arial";
+    ctx.fillStyle = "black";
+    ctx.fillText("Cilindro com gás comprimido", 200, 35);
+
+    ctx.font = "16px Arial";
+    ctx.fillText("Pistão móvel", esquerda + largura - 35, topo + altura + 35);
+
+    requestAnimationFrame(desenhar);
+}
+
+desenhar();
+</script>
+
+</body>
+</html>
